@@ -1,0 +1,276 @@
+import pyttsx3
+import speech_recognition as sr
+import datetime
+import wikipedia
+import webbrowser
+import os
+import pywhatkit
+import requests
+import smtplib
+import subprocess
+import pyjokes
+import random
+import time
+import openai
+from playsound import playsound
+
+# API Keys
+OPENAI_API_KEY = "your_openai_api_key_here"
+openai.api_key = OPENAI_API_KEY
+
+# Voice Engine Setup
+engine = pyttsx3.init()
+voices = engine.getProperty('voices')
+engine.setProperty('voice', voices[0].id)
+engine.setProperty('rate', 170)
+
+def speak(text):
+    print(f"Jarvis: {text}")
+    engine.say(text)
+    engine.runAndWait()
+
+def wish_me():
+    hour = int(datetime.datetime.now().hour)
+    if hour < 12:
+        speak("Good morning!")
+    elif hour < 18:
+        speak("Good afternoon!")
+    else:
+        speak("Good evening!")
+    speak("I am Jarvis. How can I assist you today?")
+
+def take_command():
+    r = sr.Recognizer()
+    with sr.Microphone() as source:
+        print("\nListening...")
+        r.pause_threshold = 2
+        audio = r.listen(source)
+    try:
+        print("Recognizing...")
+        query = r.recognize_google(audio, language='en-in')
+        print(f"You said: {query}")
+    except Exception:
+        speak("Sorry, I didn't catch that.")
+        return "None"
+    return query.lower()
+
+def open_website(query):
+    websites = {
+        "youtube": "https://youtube.com",
+        "google": "https://google.com",
+        "gmail": "https://mail.google.com",
+        "whatsapp": "https://web.whatsapp.com",
+        "facebook": "https://facebook.com",
+        "instagram": "https://instagram.com",
+        "twitter": "https://twitter.com",
+        "linkedin": "https://linkedin.com",
+        "amazon": "https://amazon.in",
+        "flipkart": "https://flipkart.com",
+        "stackoverflow": "https://stackoverflow.com",
+        "github": "https://github.com",
+        "chatgpt": "https://chat.openai.com"
+    }
+    for site in websites:
+        if site in query:
+            speak(f"Opening {site}")
+            webbrowser.open(websites[site])
+            return True
+    return False
+
+def get_weather(city="Delhi"):
+    api_key = "your_api_key_here"
+    base_url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric"
+    try:
+        response = requests.get(base_url)
+        data = response.json()
+        if data["cod"] != "404":
+            temp = data["main"]["temp"]
+            desc = data["weather"][0]["description"]
+            speak(f"The temperature in {city} is {temp} degrees Celsius with {desc}.")
+        else:
+            speak("City not found.")
+    except:
+        speak("Unable to fetch weather.")
+
+def send_email(to, content):
+    try:
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login('your_email@gmail.com', 'your_app_password')
+        server.sendmail('your_email@gmail.com', to, content)
+        server.quit()
+        speak("Email has been sent.")
+    except Exception as e:
+        print(e)
+        speak("Failed to send email.")
+
+def set_reminder(message, delay_seconds):
+    speak(f"Reminder set for {delay_seconds // 60} minutes.")
+    time.sleep(delay_seconds)
+    speak(f"Reminder: {message}")
+
+def set_alarm(alarm_time):
+    speak(f"Alarm set for {alarm_time}")
+    while True:
+        if datetime.datetime.now().strftime("%H:%M") == alarm_time:
+            speak("Wake up! This is your alarm.")
+            playsound("alarm.mp3")  # Add an alarm.mp3 file
+            break
+        time.sleep(10)
+
+def get_news():
+    url = "https://newsapi.org/v2/top-headlines?country=in&apiKey=your_news_api_key"
+    try:
+        response = requests.get(url)
+        data = response.json()
+        articles = data["articles"][:5]
+        speak("Here are the top news headlines:")
+        for i, article in enumerate(articles, start=1):
+            speak(f"{i}: {article['title']}")
+    except:
+        speak("Unable to fetch news.")
+
+def chat_with_ai(prompt):
+    try:
+        completion = openai.Completion.create(
+            engine="text-davinci-003",
+            prompt=prompt,
+            max_tokens=150,
+            temperature=0.9
+        )
+        response = completion.choices[0].text.strip()
+        speak(response)
+    except Exception as e:
+        speak("Sorry, AI is not responding right now.")
+        print(e)
+
+def play_music():
+    music_dir = "music"
+    songs = os.listdir(music_dir)
+    if songs:
+        speak("Playing music.")
+        os.startfile(os.path.join(music_dir, songs[0]))
+    else:
+        speak("No songs found in your music folder.")
+
+def run_jarvis():
+    wish_me()
+    while True:
+        query = take_command()
+
+        if query == "none":
+            continue
+
+        elif 'wikipedia' in query:
+            speak('Searching Wikipedia...')
+            query = query.replace("wikipedia", "")
+            try:
+                results = wikipedia.summary(query, sentences=2)
+                speak("According to Wikipedia")
+                speak(results)
+            except:
+                speak("Sorry, no result found.")
+
+        elif open_website(query):
+            continue
+
+        elif 'time' in query:
+            time_now = datetime.datetime.now().strftime("%H:%M:%S")
+            speak(f"The time is {time_now}")
+
+        elif 'play' in query:
+            song = query.replace('play', '').strip()
+            speak(f"Playing {song} on YouTube")
+            pywhatkit.playonyt(song)
+
+        elif 'note' in query:
+            speak("What should I write down?")
+            note = take_command()
+            with open('jarvis_note.txt', 'w') as f:
+                f.write(note)
+            speak("Note saved.")
+
+        elif 'read note' in query:
+            try:
+                with open('jarvis_note.txt', 'r') as f:
+                    content = f.read()
+                    speak("Here's your note:")
+                    speak(content)
+            except:
+                speak("No note found.")
+
+        elif 'weather' in query:
+            speak("For which city?")
+            city = take_command()
+            get_weather(city)
+
+        elif 'calculate' in query:
+            speak("What should I calculate?")
+            expr = take_command()
+            try:
+                result = eval(expr)
+                speak(f"The answer is {result}")
+            except:
+                speak("I can't calculate that.")
+
+        elif 'send email' in query:
+            speak("What should I say?")
+            content = take_command()
+            speak("To whom?")
+            to = take_command()
+            send_email(to, content)
+
+        elif 'open notepad' in query:
+            subprocess.Popen(['notepad.exe'])
+            speak("Opening Notepad.")
+
+        elif 'open calculator' in query:
+            subprocess.Popen('calc.exe')
+            speak("Opening Calculator.")
+
+        elif 'joke' in query:
+            speak(pyjokes.get_joke())
+
+        elif 'fact' in query:
+            facts = [
+                "Bananas are berries, but strawberries aren't.",
+                "Octopuses have three hearts.",
+                "Honey never spoils.",
+                "You blink 20 times per minute.",
+                "Lightning is hotter than the sun."
+            ]
+            speak(random.choice(facts))
+
+        elif 'reminder' in query:
+            speak("What should I remind you about?")
+            msg = take_command()
+            speak("In how many minutes?")
+            mins = int(take_command())
+            set_reminder(msg, mins * 60)
+
+        elif 'alarm' in query:
+            speak("What time should I set the alarm? Say in HH:MM format.")
+            alarm_time = take_command()
+            set_alarm(alarm_time)
+
+        elif 'news' in query:
+            get_news()
+
+        elif 'chat with ai' in query:
+            speak("What would you like to talk about?")
+            prompt = take_command()
+            chat_with_ai(prompt)
+
+        elif 'play music' in query:
+            play_music()
+
+        elif 'shutdown' in query:
+            speak("Shutting down the system.")
+            os.system("shutdown /s /t 1")
+
+        elif 'exit' in query or 'quit' in query:
+            speak("Goodbye! Have a great day.")
+            break
+
+# Start Jarvis
+run_jarvis()
